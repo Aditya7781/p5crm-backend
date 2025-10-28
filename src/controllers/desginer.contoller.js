@@ -4,20 +4,13 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { Project } from "../models/project.model.js";
 import { Staff } from "../models/staff.model.js";
 
-// ✅ 0. Designer Test Endpoint
-const designerTest = asyncHandler(async (req, res) => {
-    const designerUser = req.user;
-    return res
-        .status(200)
-        .json(new ApiResponse(200, designerUser, "Designer user is logged in"));
-});
-
-// ✅ 1. List all projects assigned to the designer
+// 1. List all projects assigned to the designer
 const listDesignerProjects = asyncHandler(async (req, res) => {
+    // Find projects where the designer is the logged-in user
     const projects = await Project.find({ designer: req.user._id })
         .populate({
             path: "projectLead",
-            select: "_id", // only fetch the lead's user ID
+            select: "_id", // Select user id to find staff
         })
         .select(
             "projectID projectName sow createdAt deadline designStatus requirement"
@@ -29,7 +22,7 @@ const listDesignerProjects = asyncHandler(async (req, res) => {
             .json(new ApiResponse(200, [], "No projects assigned to you"));
     }
 
-    // Fetch staff names for each project lead
+    // Find staff names for each project lead
     const projectsWithLeadNames = await Promise.all(
         projects.map(async (project) => {
             const staff = await Staff.findOne({
@@ -38,12 +31,12 @@ const listDesignerProjects = asyncHandler(async (req, res) => {
             return {
                 projectID: project.projectID,
                 projectName: project.projectName,
-                Description: project.sow, // alias
+                Description: project.sow, // Aliasing sow as Description
                 projectLead: staff ? staff.name : "N/A",
                 createdOn: project.createdAt,
                 deadline: project.deadline,
                 designStatus: project.designStatus,
-                uploadfigma: project.requirement, // alias
+                uploadfigma: project.requirement, // Aliasing requirement as uploadfigma
             };
         })
     );
@@ -59,15 +52,17 @@ const listDesignerProjects = asyncHandler(async (req, res) => {
         );
 });
 
-// ✅ 2. Update the design status of a project
+// 2. Update the design status of a project
 const updateDesignStatus = asyncHandler(async (req, res) => {
     const { projectID } = req.params;
     const { designStatus } = req.body;
 
+    // Validate input
     if (!designStatus) {
         throw new ApiError(400, "Design status is required");
     }
 
+    // Check for valid status
     const allowedStatus = [
         "in progress",
         "not started",
@@ -78,9 +73,14 @@ const updateDesignStatus = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid design status value");
     }
 
+    // Find the project and verify the designer
     const project = await Project.findOne({ projectID });
-    if (!project) throw new ApiError(404, "Project not found");
 
+    if (!project) {
+        throw new ApiError(404, "Project not found");
+    }
+
+    // Ensure the logged-in user is the assigned designer
     if (project.designer.toString() !== req.user._id.toString()) {
         throw new ApiError(
             403,
@@ -88,6 +88,7 @@ const updateDesignStatus = asyncHandler(async (req, res) => {
         );
     }
 
+    // Update the status
     project.designStatus = designStatus;
     await project.save({ validateBeforeSave: false });
 
@@ -98,16 +99,23 @@ const updateDesignStatus = asyncHandler(async (req, res) => {
         );
 });
 
-// ✅ 3. Update the Figma link for a project
+// 3. Update the Figma link for a project
 const updateFigmaLink = asyncHandler(async (req, res) => {
     const { projectID } = req.params;
     const { figmaLink } = req.body;
 
-    if (!figmaLink) throw new ApiError(400, "Figma link is required");
+    if (!figmaLink) {
+        throw new ApiError(400, "Figma link is required");
+    }
 
+    // Find the project and verify the designer
     const project = await Project.findOne({ projectID });
-    if (!project) throw new ApiError(404, "Project not found");
 
+    if (!project) {
+        throw new ApiError(404, "Project not found");
+    }
+
+    // Ensure the logged-in user is the assigned designer
     if (project.designer.toString() !== req.user._id.toString()) {
         throw new ApiError(
             403,
@@ -115,6 +123,7 @@ const updateFigmaLink = asyncHandler(async (req, res) => {
         );
     }
 
+    // Update the requirement field (aliased as figmaLink)
     project.requirement = figmaLink;
     await project.save({ validateBeforeSave: false });
 
@@ -123,9 +132,4 @@ const updateFigmaLink = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, project, "Figma link updated successfully"));
 });
 
-export {
-    designerTest,
-    listDesignerProjects,
-    updateDesignStatus,
-    updateFigmaLink,
-};
+export { listDesignerProjects, updateDesignStatus, updateFigmaLink };
