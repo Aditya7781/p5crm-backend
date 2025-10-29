@@ -9,7 +9,7 @@ const app = express();
 // ✅ Enable CORS
 app.use(
     cors({
-        origin: ["http://localhost:5173", "https://p5crm.vercel.app/"],
+        origin: ["http://localhost:5173", "https://p5crm.vercel.app/login"],
         credentials: true,
     })
 );
