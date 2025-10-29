@@ -1,15 +1,33 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
 
 import userRouter from "./routes/user.route.js";
+import projectLeadRouter from "./routes/projectLead.route.js";
+import adminRouter from "./routes/admin.route.js";
+import designerRouter from "./routes/designer.route.js";
+import frontendRouter from "./routes/frontend.route.js";
+import backendRouter from "./routes/backend.route.js";
+
+// ✅ Load environment variables
+dotenv.config();
 
 const app = express();
 
-// ✅ Enable CORS
+// ✅ Enable CORS using .env origins
+const allowedOrigins = process.env.CORS_ORIGIN?.split(",") || [];
+
 app.use(
     cors({
-        origin: ["http://localhost:5173", "https://p5crm.vercel.app/login"],
+        origin: function (origin, callback) {
+            if (!origin) return callback(null, true); // allow Postman, curl, etc.
+            if (allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
+        },
         credentials: true,
     })
 );
@@ -32,12 +50,7 @@ app.use(
 // ✅ Parse cookies
 app.use(cookieParser());
 
-import projectLeadRouter from "./routes/projectLead.route.js";
-import adminRouter from "./routes/admin.route.js";
-import designerRouter from "./routes/designer.route.js";
-import frontendRouter from "./routes/frontend.route.js";
-import backendRouter from "./routes/backend.route.js";
-
+// ✅ Routes
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/project-lead", projectLeadRouter);
