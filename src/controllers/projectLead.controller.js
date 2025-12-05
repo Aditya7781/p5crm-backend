@@ -1,111 +1,73 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiError } from "../utils/ApiError.js";
 import { ProjectLead } from "../models/projectLead.model.js";
-import { Project } from "../models/project.model.js";
 
-/**
- * @desc   Test route for project lead authentication
- * @route  GET /pl/pltest
- * @access Project Lead (protected)
- */
-const projectLeadTest = asyncHandler(async (req, res) => {
-    const projectLeadUser = req.user;
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(200, projectLeadUser, "Project Lead is logged in")
-        );
-});
-
-/**
- * @desc   List all projects assigned to the logged-in Project Lead
- * @route  GET /pl/projects
- * @access Project Lead (protected)
- */
-const listAllProjects = asyncHandler(async (req, res) => {
-    // Step 1: Find all projects where the current user is the project lead
-    const assignedProjects = await Project.find({
-        projectLead: req.user._id,
-    }).select("_id");
-
-    if (!assignedProjects || assignedProjects.length === 0) {
-        return res
-            .status(200)
-            .json(new ApiResponse(200, [], "No projects found for this lead"));
-    }
-
-    // Step 2: Extract the project IDs
-    const projectIds = assignedProjects.map((p) => p._id);
-
-    // Step 3: Find corresponding ProjectLead documents
-    const projectLeadDocs = await ProjectLead.find({
-        project: { $in: projectIds },
-    }).populate({
-        path: "project",
-        select: "projectID projectName sow createdAt deadline status awsDetails features",
+// GET all project lead entries
+export const listAllProjects = asyncHandler(async (req, res) => {
+    const data = await ProjectLead.find({});
+    res.status(200).json({
+        success: true,
+        count: data.length,
+        data,
     });
+});
 
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(
-                200,
-                projectLeadDocs,
-                "Projects fetched successfully"
-            )
-        );
+export const debugProjectLeads = asyncHandler(async (req, res) => {
+    const docs = await ProjectLead.find();
+    return res.json(docs);
 });
 
 /**
- * @desc   Edit repository details (pushToP5Repo) for a specific project
- * @route  PATCH /pl/edit/:projectID
- * @access Project Lead (protected)
+ * @route POST /api/v1/pl/details/:projectID
+ * @desc Add or update complete project lead record
  */
-const editProject = asyncHandler(async (req, res) => {
+export const addOrUpdateProjectLeadDetails = asyncHandler(async (req, res) => {
     const { projectID } = req.params;
-    const { pushToP5Repo } = req.body;
 
-    // Find the project by its projectID
-    const project = await Project.findOne({ projectID });
-    if (!project) {
-        throw new ApiError(404, "Project not found with the provided ID");
+    // Extract everything from request body
+    const {
+        projectName,
+        status,
+        deadline,
+        figmaLink,
+        sowFileLink,
+        pushToP5Repo,
+        awsId,
+        awsPass,
+        apiRepository = [],
+    } = req.body;
+
+    if (!projectName) throw new ApiError(400, "Project name is required");
+
+    // Find or create new document
+    let doc = await ProjectLead.findOne({ projectID });
+
+    if (!doc) {
+        doc = new ProjectLead({ projectID, projectName });
     }
 
-    // Find the ProjectLead document using the project reference
-    const projectLeadDoc = await ProjectLead.findOne({ project: project._id });
+    // Update all fields
+    doc.projectName = projectName || doc.projectName;
+    doc.status = status || doc.status;
+    doc.deadline = deadline || doc.deadline;
+    doc.figmaLink = figmaLink || doc.figmaLink;
+    doc.sowFileLink = sowFileLink || doc.sowFileLink;
+    doc.pushToP5Repo =
+        pushToP5Repo === "true" ||
+        pushToP5Repo === true ||
+        pushToP5Repo === "yes";
+    doc.awsDetails = {
+        id: awsId || doc.awsDetails?.id || "",
+        pass: awsPass || doc.awsDetails?.pass || "",
+    };
+    doc.apiRepository = Array.isArray(apiRepository) ? apiRepository : [];
 
-    if (!projectLeadDoc) {
-        throw new ApiError(
-            404,
-            "Project lead details not found for this project"
-        );
-    }
-
-    // Update fields
-    if (pushToP5Repo !== undefined) {
-        projectLeadDoc.pushToP5Repo = pushToP5Repo;
-    }
-
-    await projectLeadDoc.save();
-
-    // Return updated document with populated project details
-    const updatedProject = await ProjectLead.findById(
-        projectLeadDoc._id
-    ).populate({
-        path: "project",
-        select: "projectID projectName sow createdAt deadline status awsDetails features",
-    });
+    await doc.save();
 
     return res
         .status(200)
         .json(
-            new ApiResponse(
-                200,
-                updatedProject,
-                "Project details updated successfully"
-            )
+            new ApiResponse(200, doc, "Project Lead entry saved successfully")
         );
 });
-
-export { projectLeadTest, listAllProjects, editProject };

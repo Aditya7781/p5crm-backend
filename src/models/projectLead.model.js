@@ -1,52 +1,28 @@
 import mongoose from "mongoose";
 
-const apiSchema = new mongoose.Schema(
-    {
-        endpoint: {
-            type: String,
-            required: true,
-        },
-        method: {
-            type: String,
-            enum: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-            required: true,
-        },
-        requestFormat: {
-            type: Object, // structure of request body expected by backend
-        },
-        responseFormat: {
-            type: Object, // structure of response expected by frontend
-        },
-        implemented: {
-            type: Boolean,
-            default: false,
-        },
-        implementedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-        },
-        verfiedByFrontend: {
-            type: Boolean,
-            default: false,
-        },
-    },
-    {
-        timestamps: true,
-    }
-);
+const apiRepositoryItemSchema = new mongoose.Schema({
+    label: { type: String, required: true }, // e.g., "User API", "Auth API"
+    link: { type: String, default: "" }, // URL to the API endpoint
+});
+
 const projectLeadSchema = new mongoose.Schema(
     {
-        project: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Project",
-            required: true,
-            unique: true,
+        projectID: { type: String, required: true, unique: true }, // unique project identifier
+        projectName: { type: String, required: true },
+        status: { type: String, default: "Ongoing" },
+        deadline: { type: Date, default: null },
+        createdOn: { type: Date, default: Date.now },
+
+        figmaLink: { type: String, default: "" },
+        sowFileLink: { type: String, default: "" }, // Drive link
+        pushToP5Repo: { type: Boolean, default: false },
+
+        awsDetails: {
+            id: { type: String, default: "" },
+            pass: { type: String, default: "" },
         },
-        pushToP5Repo: {
-            type: Boolean,
-            default: false,
-        },
-        apiRepository: [apiSchema],
+
+        apiRepository: [apiRepositoryItemSchema],
     },
     { timestamps: true }
 );

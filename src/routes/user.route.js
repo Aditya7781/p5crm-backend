@@ -8,7 +8,6 @@ import {
 } from "../controllers/admin.controllers.js";
 import { loginUser } from "../controllers/auth.controllers.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
-import { projectLeadTest } from "../controllers/projectLead.controller.js";
 import { backendTest } from "../controllers/backend.controllers.js";
 import { frontendTest } from "../controllers/frontend.controllers.js";
 import { designerTest } from "../controllers/designer.controllers.js";
@@ -32,7 +31,7 @@ router
     .patch(verifyJWT(["admin"]), changePassword);
 
 //project Lead
-router.route("/pl/pltest").get(verifyJWT(["project lead"]), projectLeadTest);
+//router.route("/pl/pltest").get(verifyJWT(["project lead"]), projectLeadTest);
 
 //backend
 router.route("/b/btest").get(verifyJWT(["backend"]), backendTest);

@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Project } from "../models/project.model.js";
 import { Staff } from "../models/staff.model.js";
+import { DesignerWorking } from "../models/designerWorking.model.js";
 
 // ✅ 0. Designer Test Endpoint
 const designerTest = asyncHandler(async (req, res) => {
@@ -12,51 +13,22 @@ const designerTest = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, designerUser, "Designer user is logged in"));
 });
 
-// ✅ 1. List all projects assigned to the designer
+// ✅ 1.
 const listDesignerProjects = asyncHandler(async (req, res) => {
-    const projects = await Project.find({ designer: req.user._id })
+    const projects = await Project.find({})
         .populate({
             path: "projectLead",
-            select: "_id", // only fetch the lead's user ID
+            select: "_id",
         })
         .select(
             "projectID projectName sow createdAt deadline designStatus requirement"
         );
 
-    if (!projects || projects.length === 0) {
-        return res
-            .status(200)
-            .json(new ApiResponse(200, [], "No projects assigned to you"));
-    }
-
-    // Fetch staff names for each project lead
-    const projectsWithLeadNames = await Promise.all(
-        projects.map(async (project) => {
-            const staff = await Staff.findOne({
-                user: project.projectLead._id,
-            }).select("name");
-            return {
-                projectID: project.projectID,
-                projectName: project.projectName,
-                Description: project.sow, // alias
-                projectLead: staff ? staff.name : "N/A",
-                createdOn: project.createdAt,
-                deadline: project.deadline,
-                designStatus: project.designStatus,
-                uploadfigma: project.requirement, // alias
-            };
-        })
-    );
-
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(
-                200,
-                projectsWithLeadNames,
-                "Projects fetched successfully"
-            )
-        );
+    res.status(200).json({
+        success: true,
+        count: projects.length,
+        data: projects,
+    });
 });
 
 // ✅ 2. Update the design status of a project
@@ -123,9 +95,75 @@ const updateFigmaLink = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, project, "Figma link updated successfully"));
 });
 
+const addDesignerWorking = asyncHandler(async (req, res) => {
+    const {
+        projectID,
+        projectName,
+        description,
+        projectLead,
+        deadline,
+        status,
+        figmaLink,
+    } = req.body;
+
+    if (!projectID || !projectName || !projectLead || !deadline) {
+        throw new ApiError(
+            400,
+            "projectID, projectName, projectLead, and deadline are required"
+        );
+    }
+
+    const entry = await DesignerWorking.create({
+        projectID,
+        projectName,
+        description: description || "",
+        projectLead,
+        deadline,
+        status: status || "not started",
+        figmaLink: figmaLink || "",
+    });
+
+    return res
+        .status(201)
+        .json(new ApiResponse(201, entry, "Designer working entry created"));
+});
+
+const listDesignerWorking = asyncHandler(async (req, res) => {
+    const entries = await DesignerWorking.find().sort({ createdAt: -1 });
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, entries, "Designer working list fetched"));
+});
+
+const updateDesignerWorking = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { status, figmaLink, description } = req.body;
+
+    const entry = await DesignerWorking.findById(id);
+    if (!entry) throw new ApiError(404, "Working entry not found");
+
+    if (entry.designer.toString() !== req.user._id.toString()) {
+        throw new ApiError(403, "Not authorized to update this entry");
+    }
+
+    if (status) entry.status = status;
+    if (figmaLink) entry.figmaLink = figmaLink;
+    if (description) entry.description = description;
+
+    await entry.save();
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, entry, "Working entry updated"));
+});
+
 export {
     designerTest,
     listDesignerProjects,
     updateDesignStatus,
     updateFigmaLink,
+    addDesignerWorking,
+    listDesignerWorking,
+    updateDesignerWorking,
 };
